@@ -1,0 +1,63 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: transfer-system:latest
+    container_name: transfer-system
+    environment:
+      PORT: "9000"
+      ENV: production
+      DATABASE_URL: postgres://postgres:tareq123@postgres:5432/transfer-system?sslmode=disable
+    ports:
+      - "9000:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - local-network
+    restart: unless-stopped
+  postgres:
+    image: postgres:17.5
+    container_name: my-postgres
+    environment:
+      POSTGRES_PASSWORD: tareq123
+      POSTGRES_DB: transfer-system
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d transfer-system"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - local-network
+
+  pgadmin:
+    image: dpage/pgadmin4:9.6
+    container_name: my-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: tareqoalahdal@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: tareq123
+    ports:
+      - "8080:80"
+    depends_on:
+      postgres:
+        condition: service_started
+    restart: unless-stopped
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - local-network
+
+networks:
+  local-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  pgadmin-data:

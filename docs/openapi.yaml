@@ -1,0 +1,277 @@
+openapi: 3.0.3
+info:
+  title: Transfer System API
+  version: 1.0.0
+  description: |
+    Simple money transfer HTTP API built with Go, Gin, and PostgreSQL.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: http://localhost:{port}
+    description: Local server
+    variables:
+      port:
+        default: "9000"
+        enum: ["9000", "8080"]
+tags:
+  - name: Accounts
+    description: Account management endpoints
+  - name: Transactions
+    description: Money transfer endpoints
+security: []
+paths:
+  /api/v1/accounts:
+    post:
+      operationId: createAccount
+      tags: [Accounts]
+      summary: Create account
+      description: Creates a new account with an initial balance.
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+            examples:
+              example:
+                value:
+                  account_id: 1
+                  initial_balance: "100.00"
+      responses:
+        '201':
+          description: Created
+          headers:
+            X-Request-ID:
+              description: Correlation ID for this request
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+
+  /api/v1/accounts/{account_id}:
+    get:
+      operationId: getAccount
+      tags: [Accounts]
+      summary: Get account
+      description: Returns the account balance.
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - name: account_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Request-ID:
+              description: Correlation ID for this request
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+              examples:
+                example:
+                  value:
+                    account_id: 1
+                    balance: "74.50"
+        '400':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+
+  /api/v1/transactions:
+    post:
+      operationId: transferMoney
+      tags: [Transactions]
+      summary: Transfer money
+      description: Transfers an amount from a source account to a destination account in a single transaction.
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferMoneyRequest'
+            examples:
+              example:
+                value:
+                  source_account_id: 1
+                  destination_account_id: 2
+                  amount: "25.50"
+      responses:
+        '200':
+          description: Transfer completed
+          headers:
+            X-Request-ID:
+              description: Correlation ID for this request
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Error400'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '500':
+          $ref: '#/components/responses/Error500'
+
+components:
+  parameters:
+    XRequestID:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: Optional client-provided correlation ID. If omitted, the server generates one and echoes it back.
+      schema:
+        type: string
+
+  schemas:
+    Decimal:
+      description: Monetary decimal. Accepts a JSON number or a stringified number.
+      oneOf:
+        - type: number
+        - type: string
+          pattern: '^-?\d+(\.\d+)?$'
+      example: "100.00"
+
+    CreateAccountRequest:
+      type: object
+      required: [account_id, initial_balance]
+      properties:
+        account_id:
+          type: integer
+          format: int64
+          example: 1
+        initial_balance:
+          $ref: '#/components/schemas/Decimal'
+
+    AccountResponse:
+      type: object
+      required: [account_id, balance]
+      properties:
+        account_id:
+          type: integer
+          format: int64
+          example: 1
+        balance:
+          $ref: '#/components/schemas/Decimal'
+
+    TransferMoneyRequest:
+      type: object
+      required: [source_account_id, destination_account_id, amount]
+      properties:
+        source_account_id:
+          type: integer
+          format: int64
+          example: 1
+        destination_account_id:
+          type: integer
+          format: int64
+          example: 2
+        amount:
+          $ref: '#/components/schemas/Decimal'
+
+    ErrorObject:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: invalid_request
+        message:
+          type: string
+          example: Invalid request payload
+
+    ErrorResponse:
+      type: object
+      required: [request_id, error]
+      properties:
+        request_id:
+          type: string
+          example: 9c0f1a14-d2a2-4b2b-a5f0-8b9c44a9e3ad
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+
+  responses:
+    Error400:
+      description: Bad Request
+      headers:
+        X-Request-ID:
+          description: Correlation ID for this request
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalid_request:
+              summary: Invalid request body
+              value:
+                request_id: 9c0f1a14-d2a2-4b2b-a5f0-8b9c44a9e3ad
+                error:
+                  code: invalid_request
+                  message: invalid_request
+            same_account:
+              summary: Source and destination are the same
+              value:
+                request_id: 9c0f1a14-d2a2-4b2b-a5f0-8b9c44a9e3ad
+                error:
+                  code: same_account
+                  message: source and destination account IDs cannot be the same
+            invalid_amount:
+              summary: Non-positive amount
+              value:
+                request_id: 9c0f1a14-d2a2-4b2b-a5f0-8b9c44a9e3ad
+                error:
+                  code: invalid_amount
+                  message: amount should be greater than zero
+            invalid_account_ids:
+              summary: Invalid account IDs
+              value:
+                request_id: 9c0f1a14-d2a2-4b2b-a5f0-8b9c44a9e3ad
+                error:
+                  code: invalid_account_ids
+                  message: invalid account IDs
+
+    Error409:
+      description: Conflict
+      headers:
+        X-Request-ID:
+          description: Correlation ID for this request
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            insufficient_balance:
+              summary: Insufficient balance
+              value:
+                request_id: 9c0f1a14-d2a2-4b2b-a5f0-8b9c44a9e3ad
+                error:
+                  code: insufficient_balance
+                  message: insufficient balance
+
+    Error500:
+      description: Internal Server Error
+      headers:
+        X-Request-ID:
+          description: Correlation ID for this request
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
